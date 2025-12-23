@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/nse-main/:path*",
+      "destination": "https://www.nseindia.com/:path*"
+    },
+    {
+      "source": "/nse-archives/:path*",
+      "destination": "https://nsearchives.nseindia.com/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
