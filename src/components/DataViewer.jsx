@@ -4,6 +4,9 @@ import { ChevronRight, ChevronDown, FileJson } from 'lucide-react';
 
 const DataNode = ({ label, value, level = 0 }) => {
   const [isOpen, setIsOpen] = React.useState(true);
+  const PAGE_SIZE = 50;
+  const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
+  
   const isObject = typeof value === 'object' && value !== null;
   const isArray = Array.isArray(value);
   
@@ -19,6 +22,19 @@ const DataNode = ({ label, value, level = 0 }) => {
     );
   }
 
+  const entries = Object.entries(value);
+  const hasMore = entries.length > visibleCount;
+
+  const handleShowMore = (e) => {
+      e.stopPropagation();
+      setVisibleCount(prev => prev + PAGE_SIZE);
+  };
+
+  const handleShowAll = (e) => {
+      e.stopPropagation();
+      setVisibleCount(entries.length);
+  }
+
   return (
     <div className="flex flex-col">
       <div 
@@ -30,7 +46,12 @@ const DataNode = ({ label, value, level = 0 }) => {
         <span className="text-secondary/70 group-hover:text-primary transition-colors">
             {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </span>
-        <span className="text-primary font-mono text-sm font-semibold">{label} {isArray ? `[${value.length}]` : '{}'}</span>
+        <span className="text-primary font-mono text-sm font-semibold">
+           {label} 
+           <span className="text-secondary/60 text-xs ml-2 font-normal">
+              {isArray ? `[${value.length}]` : `{${entries.length}}`}
+           </span>
+        </span>
       </div>
       
       <motion.div 
@@ -38,7 +59,7 @@ const DataNode = ({ label, value, level = 0 }) => {
         animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
         className="overflow-hidden"
       >
-        {Object.entries(value).map(([key, val], idx) => (
+        {entries.slice(0, visibleCount).map(([key, val], idx) => (
           <DataNode 
             key={`${key}-${idx}`} 
             label={key} 
@@ -46,6 +67,26 @@ const DataNode = ({ label, value, level = 0 }) => {
             level={level + 1} 
           />
         ))}
+        
+        {hasMore && (
+            <div 
+              style={{ marginLeft: (level + 1) * 16 }}
+              className="py-1 px-2 flex gap-3"
+            >
+                <button 
+                  onClick={handleShowMore}
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                    Show {PAGE_SIZE} more...
+                </button>
+                <button 
+                  onClick={handleShowAll}
+                  className="text-xs text-secondary hover:text-foreground hover:underline"
+                >
+                    Show all ({entries.length - visibleCount} more)
+                </button>
+            </div>
+        )}
       </motion.div>
     </div>
   );
