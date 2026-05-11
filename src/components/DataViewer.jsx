@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { ChevronRight, ChevronDown, FileJson } from 'lucide-react';
 
 const DataNode = ({ label, value, level = 0 }) => {
@@ -54,11 +53,7 @@ const DataNode = ({ label, value, level = 0 }) => {
         </span>
       </div>
       
-      <motion.div 
-        initial={false}
-        animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
-        className="overflow-hidden"
-      >
+      <div className="overflow-hidden" style={{ display: isOpen ? 'block' : 'none' }}>
         {entries.slice(0, visibleCount).map(([key, val], idx) => (
           <DataNode 
             key={`${key}-${idx}`} 
@@ -87,7 +82,7 @@ const DataNode = ({ label, value, level = 0 }) => {
                 </button>
             </div>
         )}
-      </motion.div>
+      </div>
     </div>
   );
 };

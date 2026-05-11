@@ -1,6 +1,5 @@
 import React from 'react';
 import { ExternalLink, Calendar, User, FileText, FileCode } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -48,12 +47,7 @@ const FeedItem = ({ title, link, description, pubDate, highlightTerms = [] }) =>
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
-      className="glass-card p-6 mb-4 flex flex-col gap-3 transition-all duration-300 hover:shadow-xl group"
-    >
+    <div className="glass-card p-6 mb-4 flex flex-col gap-3 transition-all duration-300 hover:shadow-xl group">
       <div className="flex justify-between items-start gap-4">
         <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
           <HighlightText text={title} terms={highlightTerms} />
@@ -125,7 +119,7 @@ const FeedItem = ({ title, link, description, pubDate, highlightTerms = [] }) =>
          )}
       </div>
 
-    </motion.div>
+    </div>
   );
 };
 

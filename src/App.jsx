@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Loader2, Newspaper, Github } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Loader2, Newspaper, Search } from 'lucide-react';
 import { fetchXMLData } from './services/rssService';
 import DataViewer from './components/DataViewer';
 import FeedList from './components/FeedList';
@@ -16,10 +16,12 @@ function App() {
 
   const [xmlData, setXmlData] = useState(null);
   const [disclosureData, setDisclosureData] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleFetchXML = async (url) => {
+  const handleFetchXML = useCallback(async (url) => {
     setLoading(true);
     setError(null);
     try {
@@ -39,11 +41,19 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isStructuredViewerMode]);
 
   useEffect(() => {
     handleFetchXML(xmlUrlFromQuery || SOURCE_URL);
-  }, []);
+  }, [handleFetchXML, xmlUrlFromQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   return (
     <div className="min-h-screen pb-20">
@@ -55,25 +65,30 @@ function App() {
             </div>
             <h1 className="text-xl font-bold tracking-tight">NSE <span className="text-primary">Pulse</span></h1>
           </div>
-          <div className="flex items-center gap-4">
-            <button className="text-secondary hover:text-foreground transition-colors p-2">
-              <Github size={20} />
-            </button>
-            <div className="h-4 w-px bg-border"></div>
-            <span className="text-xs font-medium text-secondary">v1.0.0</span>
+          <div className="w-full" style={{ maxWidth: '420px', marginLeft: '1rem' }}>
+            {!isStructuredViewerMode && (
+              <div className="relative w-full">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-secondary">
+                  <Search size={14} />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search in feed..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 bg-card border border-border rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-lg placeholder:text-secondary/50 shadow-sm"
+                  style={{ height: '56px' }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="pt-12">
+      <main className="pt-2">
         <div className="container">
         <div className="max-w-3xl mx-auto text-center mb-12">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-          </motion.div>
+          <div></div>
         </div>
         </div>
 
@@ -94,11 +109,11 @@ function App() {
 
           {(xmlData || disclosureData) && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <div className="glass-card p-6" style={{ margin: '0 1.5rem' }}>
+              <div className="glass-card p-4" style={{ margin: '0 1.5rem' }}>
                 {isStructuredViewerMode ? (
                   <DisclosureCard item={disclosureData?.disclosure} />
                 ) : SOURCE_FORMAT === 'rss_channel_items' ? (
-                  <FeedList feedData={xmlData} />
+                  <FeedList feedData={xmlData} searchTerm={debouncedSearchTerm} />
                 ) : (
                   <DataViewer data={xmlData} />
                 )}

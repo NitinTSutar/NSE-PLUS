@@ -34,7 +34,7 @@ export const fetchXMLText = async (url) => {
       const proxyResponse = await fetch(proxyUrl);
       const proxyData = await proxyResponse.json();
       return proxyData.contents;
-    } catch (proxyError) {
+    } catch {
       throw new Error('Failed to fetch data. ' + error.message);
     }
   }
