@@ -1,15 +1,40 @@
-import React, { useState } from 'react';
-import { ExternalLink, Calendar, User, FileText, ChevronDown, ChevronUp, Loader2, FileCode } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { fetchXMLData } from '../services/rssService';
-import DataViewer from './DataViewer';
+import React from 'react';
+import { ExternalLink, Calendar, User, FileText, FileCode } from 'lucide-react';
+import { motion } from 'framer-motion';
 
-const FeedItem = ({ title, link, description, pubDate }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [details, setDetails] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const HighlightText = ({ text, terms, className }) => {
+  const sourceText = text || '';
+  const cleanTerms = (terms || []).map((term) => term?.trim()).filter(Boolean);
+
+  if (!sourceText || cleanTerms.length === 0) {
+    return <span className={className}>{sourceText}</span>;
+  }
+
+  const uniqueTerms = [...new Set(cleanTerms.map((term) => term.toLowerCase()))];
+  const pattern = uniqueTerms.map(escapeRegExp).join('|');
+  const regex = new RegExp(`(${pattern})`, 'ig');
+  const parts = sourceText.split(regex);
+
+  return (
+    <span className={className}>
+      {parts.map((part, index) => {
+        const isMatch = uniqueTerms.includes(part.toLowerCase());
+        if (isMatch) {
+          return (
+            <mark key={`${part}-${index}`} className="bg-primary/10 text-primary rounded px-1">
+              {part}
+            </mark>
+          );
+        }
+        return <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>;
+      })}
+    </span>
+  );
+};
+
+const FeedItem = ({ title, link, description, pubDate, highlightTerms = [] }) => {
   // Extract acquirer name from description if it matches the pattern
   const acquirerMatch = description?.match(/NAME\(S\)OF THE ACQUIRER AND ITS\(PAC\) : (.*)/);
   const acquirerName = acquirerMatch ? acquirerMatch[1] : description;
@@ -17,26 +42,9 @@ const FeedItem = ({ title, link, description, pubDate }) => {
   const isPDF = link?.toLowerCase().endsWith('.pdf');
   const isXML = link?.toLowerCase().endsWith('.xml');
 
-  const handleViewData = async () => {
-    if (isExpanded) {
-      setIsExpanded(false);
-      return;
-    }
-
-    setIsExpanded(true);
-
-    if (!details && !loading) {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await fetchXMLData(link);
-        setDetails(data);
-      } catch (err) {
-        setError("Failed to load data structure. " + err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
+  const openStructuredViewer = () => {
+    const target = `${window.location.origin}${window.location.pathname}?xmlUrl=${encodeURIComponent(link)}`;
+    window.open(target, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -48,16 +56,16 @@ const FeedItem = ({ title, link, description, pubDate }) => {
     >
       <div className="flex justify-between items-start gap-4">
         <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
-          {title}
+          <HighlightText text={title} terms={highlightTerms} />
         </h3>
         <div className="flex gap-2 shrink-0">
            {isXML && (
              <button 
-               onClick={handleViewData}
-               className={`p-2 rounded-full transition-all ${isExpanded ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'hover:bg-primary/10 text-secondary hover:text-primary'}`}
+               onClick={openStructuredViewer}
+               className="p-2 rounded-full transition-all hover:bg-primary/10 text-secondary hover:text-primary"
                title="View Structured Data"
              >
-               {isExpanded ? <ChevronUp size={20} /> : <FileCode size={20} />}
+               <FileCode size={20} />
              </button>
            )}
            <a 
@@ -80,14 +88,14 @@ const FeedItem = ({ title, link, description, pubDate }) => {
         {acquirerName && (
           <div className="flex items-center gap-1.5">
             <User size={14} className="text-primary/70" />
-            <span className="font-medium">{acquirerName}</span>
+            <HighlightText text={acquirerName} terms={highlightTerms} className="font-medium" />
           </div>
         )}
       </div>
 
       {description && !acquirerMatch && (
         <p className="text-secondary leading-relaxed line-clamp-2">
-          {description}
+          <HighlightText text={description} terms={highlightTerms} />
         </p>
       )}
 
@@ -100,10 +108,10 @@ const FeedItem = ({ title, link, description, pubDate }) => {
          
          {isXML ? (
              <button 
-               onClick={handleViewData}
+               onClick={openStructuredViewer}
                className="text-primary text-xs font-semibold hover:underline flex items-center gap-1"
              >
-               {isExpanded ? 'Hide Data' : 'View Data'}
+               View Structured Data
              </button>
          ) : (
              <a 
@@ -116,30 +124,6 @@ const FeedItem = ({ title, link, description, pubDate }) => {
              </a>
          )}
       </div>
-
-      {/* Expanded Data View */}
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="animate-spin text-primary" size={24} />
-              </div>
-            ) : error ? (
-              <div className="p-4 mt-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-sm font-medium">
-                {error}
-              </div>
-            ) : (
-              <DataViewer data={details} />
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
 
     </motion.div>
   );

@@ -1,39 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Loader2, Newspaper, ArrowRight, Github } from 'lucide-react';
-import { fetchRSSFeed } from './services/rssService';
+import React, { useEffect, useState } from 'react';
+import { Loader2, Newspaper, Github } from 'lucide-react';
+import { fetchXMLData } from './services/rssService';
+import DataViewer from './components/DataViewer';
 import FeedList from './components/FeedList';
+import DisclosureCard from './components/DisclosureCard';
+import { getDisclosureFromXmlUrl } from './services/disclosureService';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function App() {
-  const [url, setUrl] = useState('');
-  const [feedData, setFeedData] = useState(null);
+  const SOURCE_URL = 'https://nsearchives.nseindia.com/content/RSS/Online_announcements.xml';
+  const SOURCE_FORMAT = 'rss_channel_items';
+  const searchParams = new URLSearchParams(window.location.search);
+  const xmlUrlFromQuery = searchParams.get('xmlUrl');
+  const isStructuredViewerMode = Boolean(xmlUrlFromQuery);
+
+  const [xmlData, setXmlData] = useState(null);
+  const [disclosureData, setDisclosureData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleFetch = async (e) => {
-    if (e) e.preventDefault();
-    if (!url) return;
-
+  const handleFetchXML = async (url) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchRSSFeed(url);
-      setFeedData(data);
+      if (isStructuredViewerMode) {
+        const disclosure = await getDisclosureFromXmlUrl(url);
+        setDisclosureData(disclosure);
+        setXmlData(null);
+      } else {
+        const data = await fetchXMLData(url);
+        setXmlData(data);
+        setDisclosureData(null);
+      }
     } catch (err) {
       setError(err.message);
-      setFeedData(null);
+      setXmlData(null);
+      setDisclosureData(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    handleFetch();
+    handleFetchXML(xmlUrlFromQuery || SOURCE_URL);
   }, []);
 
   return (
     <div className="min-h-screen pb-20">
-      {/* Header */}
       <header className="bg-card/50 backdrop-blur-md sticky top-0 z-10 border-b border-border py-4">
         <div className="container flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -43,62 +56,30 @@ function App() {
             <h1 className="text-xl font-bold tracking-tight">NSE <span className="text-primary">Pulse</span></h1>
           </div>
           <div className="flex items-center gap-4">
-             <button className="text-secondary hover:text-foreground transition-colors p-2">
-                <Github size={20} />
-             </button>
-             <div className="h-4 w-px bg-border"></div>
-             <span className="text-xs font-medium text-secondary">v1.0.0</span>
+            <button className="text-secondary hover:text-foreground transition-colors p-2">
+              <Github size={20} />
+            </button>
+            <div className="h-4 w-px bg-border"></div>
+            <span className="text-xs font-medium text-secondary">v1.0.0</span>
           </div>
         </div>
       </header>
 
-      <main className="container pt-12">
-        {/* Intro Section */}
+      <main className="pt-12">
+        <div className="container">
         <div className="max-w-3xl mx-auto text-center mb-12">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5 }}
           >
-            <h2 className="text-4xl md:text-5xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-foreground to-secondary">
-              Analyze NSE RSS Feeds
-            </h2>
-            <p className="text-lg text-secondary mb-8">
-              Beautifully view and explore structured data from National Stock Exchange's corporate filings.
-            </p>
           </motion.div>
-
-          {/* Search Form */}
-          <form onSubmit={handleFetch} className="relative group max-w-2xl mx-auto">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-secondary group-focus-within:text-primary transition-colors">
-              <Search size={20} />
-            </div>
-            <input
-              type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="Paste RSS feed URL here..."
-              className="w-full pl-12 pr-32 py-4 bg-card border-2 border-border rounded-2xl shadow-sm transition-all focus:border-primary focus:ring-4 focus:ring-primary/10 text-foreground font-medium"
-            />
-            <div className="absolute right-2 inset-y-2">
-               <button
-                type="submit"
-                disabled={loading}
-                className="h-full px-6 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all flex items-center gap-2 shadow-lg shadow-primary/20"
-              >
-                {loading ? <Loader2 className="animate-spin" size={18} /> : 'Fetch Feed'}
-                {!loading && <ArrowRight size={18} />}
-              </button>
-            </div>
-          </form>
-          
-
+        </div>
         </div>
 
-        {/* Content Area */}
         <AnimatePresence mode="wait">
           {error && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -111,23 +92,35 @@ function App() {
             </motion.div>
           )}
 
-          {feedData && <FeedList feedData={feedData} />}
+          {(xmlData || disclosureData) && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <div className="glass-card p-6" style={{ margin: '0 1.5rem' }}>
+                {isStructuredViewerMode ? (
+                  <DisclosureCard item={disclosureData?.disclosure} />
+                ) : SOURCE_FORMAT === 'rss_channel_items' ? (
+                  <FeedList feedData={xmlData} />
+                ) : (
+                  <DataViewer data={xmlData} />
+                )}
+              </div>
+            </motion.div>
+          )}
 
-          {!feedData && !loading && !error && (
-            <motion.div 
+          {!xmlData && !loading && !error && (
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="flex flex-col items-center justify-center py-20 opacity-40 grayscale"
             >
-               <Newspaper size={64} />
-               <p className="mt-4 font-medium italic">Waiting for feed data...</p>
+              <Newspaper size={64} />
+              <p className="mt-4 font-medium italic">Loading feed data...</p>
             </motion.div>
           )}
 
-          {loading && !feedData && (
-             <div className="flex justify-center py-20">
-                <Loader2 className="animate-spin text-primary" size={48} />
-             </div>
+          {loading && !xmlData && (
+            <div className="flex justify-center py-20">
+              <Loader2 className="animate-spin text-primary" size={48} />
+            </div>
           )}
         </AnimatePresence>
       </main>

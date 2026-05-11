@@ -1,10 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import FeedItem from './FeedItem';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search } from 'lucide-react';
 
 const FeedList = ({ feedData }) => {
+  const FILTER_OPTIONS = [
+    'Monthly business',
+    'Order Deal',
+    'Acquisition',
+    'Takeover',
+    'Fund raising',
+    'Quarter end',
+    'Financial results',
+  ];
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
   const items = feedData?.rss?.channel?.item || [];
 
   // Handle both single item and array of items from XML parser
@@ -12,12 +24,43 @@ const FeedList = ({ feedData }) => {
 
   // Filter items based on search term
   const filteredItems = itemList.filter(item => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
     const title = item.title?.toLowerCase() || '';
     const desc = item.description?.toLowerCase() || '';
-    return title.includes(term) || desc.includes(term);
+    const searchMatches = !searchTerm || title.includes(searchTerm.toLowerCase()) || desc.includes(searchTerm.toLowerCase());
+    const filterMatches = !selectedFilter || title.includes(selectedFilter.toLowerCase()) || desc.includes(selectedFilter.toLowerCase());
+    return searchMatches && filterMatches;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+  const pagedItems = filteredItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  const goToPrevPage = () => {
+    setCurrentPage((prev) => Math.max(1, prev - 1));
+  };
+
+  const goToNextPage = () => {
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
+
+  const handleFilterClick = (filter) => {
+    setSelectedFilter((prev) => (prev === filter ? '' : filter));
+    setCurrentPage(1);
+  };
+
+  const highlightTerms = [searchTerm, selectedFilter].filter(Boolean);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   if (itemList.length === 0 || !itemList[0]) {
     return (
@@ -39,29 +82,76 @@ const FeedList = ({ feedData }) => {
           </span>
         </div>
 
-        <div className="relative w-full md:w-auto min-w-[320px]">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-secondary">
-              <Search size={18} />
+        <div className="w-full md:w-auto min-w-[320px] flex flex-col gap-3">
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={goToPrevPage}
+              disabled={safeCurrentPage === 1}
+              className="px-3 py-2 bg-card border border-border rounded-xl text-sm font-semibold hover:bg-primary/10 disabled:opacity-50"
+            >
+              Prev
+            </button>
+            <span className="text-sm text-secondary font-medium">
+              {safeCurrentPage}/{totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={goToNextPage}
+              disabled={safeCurrentPage === totalPages}
+              className="px-3 py-2 bg-card border border-border rounded-xl text-sm font-semibold hover:bg-primary/10 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+
+          <div className="relative w-full">
+              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-secondary">
+                <Search size={18} />
+              </div>
+              <input
+                type="text"
+                placeholder="Search in feed..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                className="w-full pl-12 pr-4 py-4 bg-card border border-border rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-base placeholder:text-secondary/50 shadow-sm"
+              />
+          </div>
+
+          <div className="w-full overflow-x-auto">
+            <div className="flex items-center gap-2 py-1 min-w-max">
+              {FILTER_OPTIONS.map((filter) => {
+                const isSelected = selectedFilter === filter;
+                return (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => handleFilterClick(filter)}
+                    className={`px-3 py-2 rounded-full border text-sm font-medium transition-all ${
+                      isSelected
+                        ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
+                        : 'bg-card text-secondary border-border hover:bg-primary/10 hover:text-primary'
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                );
+              })}
             </div>
-            <input
-              type="text"
-              placeholder="Search in feed..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-card border border-border rounded-xl focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-base placeholder:text-secondary/50 shadow-sm"
-            />
+          </div>
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))' }}>
         <AnimatePresence mode="popLayout">
-          {filteredItems.map((item, index) => (
+          {pagedItems.map((item, index) => (
             <FeedItem 
               key={`${index}-${item.title?.substring(0, 10)}`}
               title={item.title}
               link={item.link}
               description={item.description}
               pubDate={item.pubDate}
+              highlightTerms={highlightTerms}
             />
           ))}
         </AnimatePresence>
@@ -77,6 +167,30 @@ const FeedList = ({ feedData }) => {
             </motion.div>
         )}
       </div>
+
+      {filteredItems.length > 0 && (
+        <div className="mt-6 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={goToPrevPage}
+            disabled={safeCurrentPage === 1}
+            className="px-3 py-2 bg-card border border-border rounded-xl text-sm font-semibold hover:bg-primary/10 disabled:opacity-50"
+          >
+            Prev
+          </button>
+          <span className="text-sm text-secondary font-medium">
+            {safeCurrentPage}/{totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={goToNextPage}
+            disabled={safeCurrentPage === totalPages}
+            className="px-3 py-2 bg-card border border-border rounded-xl text-sm font-semibold hover:bg-primary/10 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 };
